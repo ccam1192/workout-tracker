@@ -1,0 +1,106 @@
+export type WorkoutType = "standard" | "circuit";
+export type SessionStatus = "in_progress" | "completed" | "abandoned";
+export type WeightUnit = "lb" | "kg";
+
+export type WorkoutTemplate = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  workout_type: WorkoutType;
+  rounds: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkoutTemplateExercise = {
+  id: string;
+  template_id: string;
+  exercise_order: number;
+  name: string;
+  sets: number | null;
+  repetitions: string | null;
+  duration_seconds: number | null;
+  weight: number | null;
+  weight_unit: string | null;
+  rest_seconds: number | null;
+  notes: string | null;
+  video_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkoutTemplateWithExercises = WorkoutTemplate & {
+  workout_template_exercises: WorkoutTemplateExercise[];
+};
+
+export type WorkoutSession = {
+  id: string;
+  user_id: string;
+  template_id: string | null;
+  started_at: string;
+  completed_at: string | null;
+  status: SessionStatus;
+  workout_date: string;
+  template_name: string;
+  workout_type: WorkoutType;
+  rounds: number;
+  duration_seconds: number | null;
+  created_at: string;
+};
+
+export type WorkoutSessionRound = {
+  id: string;
+  session_id: string;
+  round_number: number;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  paused_seconds: number;
+};
+
+export type WorkoutSessionExercise = {
+  id: string;
+  session_id: string;
+  template_exercise_id: string | null;
+  exercise_order: number;
+  round_number: number;
+  set_number: number;
+  completed: boolean;
+  completed_at: string | null;
+  repetitions_completed: number | null;
+  duration_seconds_completed: number | null;
+  weight_used: number | null;
+  notes: string | null;
+  name: string;
+  sets: number | null;
+  repetitions: string | null;
+  duration_seconds: number | null;
+  weight: number | null;
+  weight_unit: string | null;
+  rest_seconds: number | null;
+  video_url: string | null;
+};
+
+export type WorkoutSessionWithDetails = WorkoutSession & {
+  workout_session_exercises: WorkoutSessionExercise[];
+  workout_session_rounds: WorkoutSessionRound[];
+};
+
+export type ExerciseDraft = {
+  key: string;
+  id?: string;
+  name: string;
+  sets: string;
+  repetitions: string;
+  duration_seconds: string;
+  weight: string;
+  weight_unit: string;
+  rest_seconds: string;
+  notes: string;
+  video_url: string;
+};
+
+export type TemplateCardData = WorkoutTemplate & {
+  exerciseCount: number;
+};

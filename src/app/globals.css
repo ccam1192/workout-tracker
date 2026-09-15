@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0f0c;
+  --bg-elevated: #111714;
+  --surface: #181f1b;
+  --surface-hover: #1f2923;
+  --border: #2c3932;
+  --text: #f4f7f4;
+  --muted: #93a197;
+  --accent: #c8f04b;
+  --accent-text: #14200a;
+  --accent-soft: rgba(200, 240, 75, 0.12);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.12);
+  --complete: #c8f04b;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-complete: var(--complete);
+  --font-sans: var(--font-outfit);
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  min-height: 100dvh;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}

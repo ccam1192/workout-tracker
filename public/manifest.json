@@ -1,0 +1,17 @@
+{
+  "name": "Workout Tracker",
+  "short_name": "Workouts",
+  "description": "Simple workouts. Simple tracking.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0b0f0c",
+  "theme_color": "#0b0f0c",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
