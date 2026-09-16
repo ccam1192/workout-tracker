@@ -1,6 +1,41 @@
-export type WorkoutType = "standard" | "circuit";
+export type WorkoutType = "standard" | "circuit" | "run";
 export type SessionStatus = "in_progress" | "completed" | "abandoned";
 export type WeightUnit = "lb" | "kg";
+
+export type ExerciseCategory =
+  | "Calisthenics"
+  | "Weight Training"
+  | "Core"
+  | "Cardio"
+  | "Other";
+
+export type GpsPoint = {
+  lat: number;
+  lng: number;
+  timestamp: number;
+  accuracy?: number;
+};
+
+export type ExerciseLibraryEntry = {
+  id: string;
+  user_id: string | null;
+  name: string;
+  category: string;
+  description: string | null;
+  form_instructions: string | null;
+  primary_muscles: string | null;
+  equipment: string | null;
+  exercise_type: string;
+  default_repetitions: string | null;
+  default_duration_seconds: number | null;
+  default_weight: number | null;
+  default_weight_unit: string | null;
+  default_rest_seconds: number | null;
+  video_url: string | null;
+  is_system_exercise: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 export type WorkoutTemplate = {
   id: string;
@@ -26,6 +61,7 @@ export type WorkoutTemplateExercise = {
   rest_seconds: number | null;
   notes: string | null;
   video_url: string | null;
+  exercise_library_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -46,6 +82,10 @@ export type WorkoutSession = {
   workout_type: WorkoutType;
   rounds: number;
   duration_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  active_duration_seconds: number | null;
+  gps_data: GpsPoint[] | null;
   created_at: string;
 };
 
@@ -90,6 +130,7 @@ export type WorkoutSessionWithDetails = WorkoutSession & {
 export type ExerciseDraft = {
   key: string;
   id?: string;
+  exercise_library_id?: string;
   name: string;
   sets: string;
   repetitions: string;

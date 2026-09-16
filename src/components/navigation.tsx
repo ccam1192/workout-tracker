@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock3, Dumbbell, LayoutGrid, Settings } from "lucide-react";
+import { BookOpen, Clock3, Dumbbell, LayoutGrid, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/workouts", label: "Workouts", icon: Dumbbell },
+  { href: "/exercises", label: "Exercises", icon: BookOpen },
   { href: "/history", label: "History", icon: Clock3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -25,7 +26,7 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg-elevated/95 backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
@@ -34,7 +35,7 @@ export function BottomNav() {
               <Link
                 href={item.href}
                 className={cn(
-                  "flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium",
+                  "flex min-h-16 flex-col items-center justify-center gap-1 text-[10px] font-medium",
                   active ? "text-accent" : "text-muted",
                 )}
               >

@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { ConfigError } from "@/components/config-error";
+import { DeleteSessionButton } from "@/components/delete-session-button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { formatDisplayDate, formatDuration } from "@/lib/dates";
-import { formatExercisePrescription, statusLabel, workoutTypeLabel } from "@/lib/format";
+import { formatDistance, formatExercisePrescription, statusLabel, workoutTypeLabel } from "@/lib/format";
+import { formatPace } from "@/lib/gps";
 import { requireUser } from "@/lib/supabase/require-user";
 import type {
   WorkoutSession,
@@ -37,6 +39,62 @@ export default async function HistoryDetailPage({
   }
 
   const typedSession = session as WorkoutSession;
+  const isRun = typedSession.workout_type === "run";
+
+  if (isRun) {
+    const distanceLabel = formatDistance(typedSession.distance, typedSession.distance_unit ?? "mi");
+    const activeDuration = typedSession.active_duration_seconds ?? typedSession.duration_seconds;
+    const pace = typedSession.distance && activeDuration
+      ? formatPace(typedSession.distance, activeDuration, (typedSession.distance_unit as "mi" | "km") ?? "mi")
+      : null;
+    const gpsPointCount = Array.isArray(typedSession.gps_data) ? typedSession.gps_data.length : 0;
+
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <header className="space-y-2">
+          <p className="text-sm text-muted">{formatDisplayDate(typedSession.workout_date)}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">{typedSession.template_name}</h1>
+          <p className="text-muted">
+            {statusLabel(typedSession.status)} · Run
+          </p>
+        </header>
+
+        <dl className="grid grid-cols-2 gap-3">
+          <div className="rounded-3xl border border-border bg-surface p-4">
+            <dt className="text-sm text-muted">Distance</dt>
+            <dd className="mt-1 text-2xl font-semibold">{distanceLabel ?? "—"}</dd>
+          </div>
+          <div className="rounded-3xl border border-border bg-surface p-4">
+            <dt className="text-sm text-muted">Duration</dt>
+            <dd className="mt-1 text-2xl font-semibold">
+              {formatDuration(activeDuration) ?? "—"}
+            </dd>
+          </div>
+          {pace ? (
+            <div className="col-span-2 rounded-3xl border border-border bg-surface p-4">
+              <dt className="text-sm text-muted">Average Pace</dt>
+              <dd className="mt-1 text-2xl font-semibold">{pace}</dd>
+            </div>
+          ) : null}
+          {gpsPointCount > 0 ? (
+            <div className="col-span-2 rounded-3xl border border-border bg-surface p-4">
+              <dt className="text-sm text-muted">GPS Data</dt>
+              <dd className="mt-1 text-sm font-medium text-muted">
+                {gpsPointCount} location points recorded
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+
+        <div className="space-y-3">
+          <ButtonLink href="/history" variant="secondary" className="w-full">
+            Back to History
+          </ButtonLink>
+          <DeleteSessionButton sessionId={typedSession.id} />
+        </div>
+      </div>
+    );
+  }
 
   const [{ data: exercises }, { data: rounds }] = await Promise.all([
     supabase
@@ -121,9 +179,12 @@ export default async function HistoryDetailPage({
         );
       })}
 
-      <ButtonLink href="/history" variant="secondary" className="w-full">
-        Back to History
-      </ButtonLink>
+      <div className="space-y-3">
+        <ButtonLink href="/history" variant="secondary" className="w-full">
+          Back to History
+        </ButtonLink>
+        <DeleteSessionButton sessionId={typedSession.id} />
+      </div>
     </div>
   );
 }

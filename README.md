@@ -1,173 +1,142 @@
 # Workout Tracker
 
-A simple, mobile-first calisthenics and workout tracking web application. Create workout templates, complete your workouts as a checklist, and keep a history of your progress.
+A personal, mobile-first workout tracker built with Next.js, TypeScript, Tailwind CSS, and Supabase.
 
 ## Features
 
-- **Workout Templates** — Create custom workout templates with exercises, sets, reps, duration, weight, notes, and YouTube form videos.
-- **Circuit & Standard Workouts** — Supports both circuit-style workouts (multiple rounds) and standard workouts.
-- **Workout Execution** — Start a workout, check off exercises as you go, and track your round time with a built-in timer.
-- **Workout History** — View completed workouts in reverse chronological order with full detail.
-- **Resume In-Progress** — Leave mid-workout and pick up exactly where you left off.
-- **Starter Workout** — New users automatically get a seeded "Morning Calisthenics" circuit to get started immediately.
-- **Authentication** — Email/password sign-up and login via Supabase Auth.
-- **Row-Level Security** — All data is private to the authenticated user.
-- **PWA-Ready** — Includes a web app manifest for add-to-home-screen support.
+### Core
+- **Authentication** — Email/password sign-up and login via Supabase Auth
+- **Workout Templates** — Create, edit, and delete reusable workout templates
+- **Standard & Circuit Workouts** — Track standard sets-based workouts or timed circuit rounds
+- **Workout Execution** — Optimistic-UI exercise completion, round timers, pause/resume
+- **Workout History** — Browse completed workouts with exercise-level detail
+- **YouTube Form Links** — Attach form videos to exercises, opened during workouts
+- **Starter Workout** — Auto-created "Morning Calisthenics" circuit for new users
+- **Mobile-first Responsive UI** — Optimized for phones (375–430px) with desktop support
 
-## Technology Stack
+### V2 — Exercise Library
+- **50 Built-in Exercises** — 25 calisthenics + 25 weight-training exercises with form instructions
+- **Exercise Picker** — Search and filter exercises by category when creating/editing workouts
+- **Custom Exercises** — Create personal exercises that auto-save to your library for reuse
+- **Exercise Library Page** — Browse, search, edit, and delete your exercises at `/exercises`
+- **Library ↔ Workout Independence** — Workout exercises reference the library but store their own settings; changing a workout does not change the library or other workouts
 
-| Layer          | Technology                       |
-| -------------- | -------------------------------- |
-| Framework      | Next.js 16 (App Router)         |
-| Language       | TypeScript                       |
-| UI             | React 19, Tailwind CSS 4        |
-| Icons          | Lucide React                     |
-| Auth & DB      | Supabase (Auth + Postgres)      |
-| Deployment     | Vercel (or any Node.js host)    |
+### V2 — Run Tracker
+- **GPS Run Tracking** — Start a run from the dashboard, track distance via the browser Geolocation API
+- **Haversine Distance Calculation** — Accurate GPS-based distance with invalid-point filtering
+- **Pause/Resume** — Pause your run without counting paused time or distance
+- **Run History** — Runs appear alongside workouts in History with distance, time, and pace
+- **GPS Error Handling** — Clear messages for denied permissions, unavailable GPS, or signal loss
 
-## Prerequisites
+### V2 — History & Performance
+- **Delete Workout History** — Remove any completed session from history with confirmation
+- **Paginated History** — Loads 20 sessions at a time with "Load More"
+- **Performance Indexes** — Optimized database indexes for common queries
+- **Optimistic UI** — Exercise completion updates instantly before database confirmation
 
-- **Node.js** 18+ (20+ recommended)
-- **npm** (comes with Node.js)
-- A **Supabase** project (free tier works)
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **UI**: React 19, Tailwind CSS 4
+- **Backend**: Supabase (Auth + PostgreSQL + RLS)
+- **Icons**: Lucide React
+- **Deployment**: Vercel
 
 ## Getting Started
 
-### 1. Install Dependencies
+### Prerequisites
+- Node.js 20+
+- A Supabase project
 
-```bash
-npm install
+### Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create `.env.local` with your Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+4. Run the database schema:
+   - **Fresh install**: Run `supabase/schema.sql` in the Supabase SQL Editor
+   - **Existing database**: Run `supabase/migrations/002_v2_features.sql` to add V2 features
+5. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+
+### V2 Migration (Existing Databases)
+
+If you already have the V1 schema, run the migration file to add V2 features:
+
+```sql
+-- Run this in Supabase SQL Editor
+-- File: supabase/migrations/002_v2_features.sql
 ```
 
-### 2. Create a Supabase Project
+This migration:
+- Creates the `exercise_library` table with RLS policies
+- Adds `exercise_library_id` to `workout_template_exercises`
+- Extends `workout_sessions` with run fields (distance, GPS data)
+- Adds `start_run_session` and `complete_run_session` RPC functions
+- Seeds 50 built-in exercises (only if none exist)
+- Adds performance indexes
 
-1. Go to [supabase.com](https://supabase.com) and sign in (or create a free account).
-2. Click **New project** and give it a name (e.g. "Workout Tracker").
-3. Choose a database password and region, then click **Create new project**.
-4. Wait for the project to finish provisioning.
+**No existing data is modified or deleted.**
 
-### 3. Find Your Supabase Credentials
+## GPS / Run Tracking Notes
 
-1. In the Supabase dashboard, go to **Project Settings → API**.
-2. Copy the **Project URL** — it looks like `https://abcdefghijkl.supabase.co`.
-3. Copy the **anon / public** key (under "Project API keys").
-
-### 4. Configure Environment Variables
-
-Create a `.env.local` file in the project root:
-
-```bash
-cp .env.example .env.local
-```
-
-Then fill in your credentials:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-### 5. Run the Database Schema
-
-1. In the Supabase dashboard, go to the **SQL Editor**.
-2. Click **New query**.
-3. Open `supabase/schema.sql` from this project, copy its entire contents, and paste it into the SQL Editor.
-4. Click **Run** (or press Cmd/Ctrl + Enter).
-
-This creates all tables, indexes, Row-Level Security policies, triggers, and helper functions (starter workout seeding, workout session creation, workout completion).
-
-### 6. Configure Authentication
-
-Supabase email/password auth is enabled by default. If you want to skip email confirmation during development:
-
-1. Go to **Authentication → Providers → Email** in the Supabase dashboard.
-2. Toggle **Confirm email** off (optional, for faster local testing).
-3. Save.
-
-### 7. Run Locally
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser. The app will show the landing page. Create an account to get started — a starter "Morning Calisthenics" workout will be automatically created for you.
-
-## Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## Deploy to Vercel
-
-1. Push this project to a Git repository (GitHub, GitLab, or Bitbucket).
-2. Go to [vercel.com](https://vercel.com) and import the repository.
-3. Add the environment variables in the Vercel project settings:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. Deploy. Vercel auto-detects Next.js and builds it correctly.
+- GPS requires **HTTPS** — Vercel deployment provides this automatically
+- `localhost` works for development (browsers allow geolocation on localhost)
+- Location permission is requested only when starting a run, not on app load
+- GPS accuracy filtering: points with accuracy > 50m are ignored
+- Speed filtering: movements > 30 mph are filtered as GPS errors
+- GPS data is stored as JSONB in the session record, not on every update
+- GPS data is protected by Supabase Row Level Security
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── (app)/                  # Authenticated route group
-│   │   ├── dashboard/          # Main dashboard
-│   │   ├── workouts/           # Template list, create, detail, edit
-│   │   ├── workout/            # Workout execution + completion
-│   │   ├── history/            # History list + detail
-│   │   └── settings/           # Account settings
-│   ├── auth/callback/          # Supabase auth callback
-│   ├── login/                  # Login page
-│   ├── signup/                 # Signup page
-│   ├── page.tsx                # Landing page
-│   ├── layout.tsx              # Root layout
-│   └── globals.css             # Theme variables + base styles
+│   ├── (app)/              # Authenticated routes
+│   │   ├── dashboard/      # Main dashboard
+│   │   ├── exercises/      # Exercise library (V2)
+│   │   ├── history/        # Workout history
+│   │   ├── settings/       # User settings
+│   │   ├── workout/        # Active workout/run player
+│   │   └── workouts/       # Workout template CRUD
+│   ├── auth/               # OAuth callback
+│   ├── login/              # Login page
+│   └── signup/             # Signup page
 ├── components/
-│   ├── ui/                     # Reusable primitives (Button, Alert, etc.)
-│   ├── app-shell.tsx           # Layout shell with sidebar/bottom nav
-│   ├── workout-player.tsx      # Workout execution engine
-│   ├── workout-form.tsx        # Create/edit template form
-│   └── ...                     # Other feature components
+│   ├── ui/                 # Reusable UI primitives
+│   ├── exercise-picker.tsx # Library exercise search (V2)
+│   ├── run-tracker.tsx     # GPS run tracking UI (V2)
+│   └── ...
 ├── hooks/
-│   └── use-start-workout.ts    # Hook for starting workout sessions
-├── lib/
-│   ├── supabase/               # Supabase client helpers
-│   ├── types.ts                # TypeScript types
-│   ├── dates.ts                # Date formatting utilities
-│   ├── format.ts               # Exercise/status formatting
-│   ├── exercises.ts            # Exercise draft helpers
-│   ├── youtube.ts              # YouTube URL validation
-│   └── utils.ts                # General utilities
-└── proxy.ts                    # Auth proxy (Next.js request handling)
+│   └── use-start-workout.ts
+└── lib/
+    ├── supabase/           # Supabase client/server helpers
+    ├── gps.ts              # Haversine, GPS validation (V2)
+    ├── types.ts            # TypeScript types
+    └── ...
 
 supabase/
-└── schema.sql                  # Full database schema + RLS policies
-
-public/
-├── icon.svg                    # App icon
-└── manifest.json               # PWA manifest
+├── schema.sql              # Full database schema (V2)
+└── migrations/
+    └── 002_v2_features.sql # Additive V2 migration
 ```
 
-## Database Schema
+## Environment Variables
 
-The database has five main tables:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Your Supabase anonymous/public key |
 
-| Table                          | Purpose                                    |
-| ------------------------------ | ------------------------------------------ |
-| `profiles`                     | User profiles (linked to Supabase Auth)    |
-| `workout_templates`            | Workout template definitions               |
-| `workout_template_exercises`   | Exercises within a template                |
-| `workout_sessions`             | Actual workout sessions performed          |
-| `workout_session_exercises`    | Snapshot of exercises during a session     |
-| `workout_session_rounds`       | Per-round timing data                      |
-
-Historical workout records are preserved even when templates are edited — exercise data is copied into session exercises at the time the workout starts.
-
-## Notes
-
-- **No Supabase CLI required** — the schema is designed to be pasted directly into the Supabase SQL Editor.
-- **No hard-coded credentials** — all configuration comes from environment variables.
-- **Graceful degradation** — if Supabase is not configured, the app compiles and shows a clear configuration error instead of crashing.
+No service-role keys are exposed to the browser. All data access is governed by RLS policies.

@@ -1,4 +1,4 @@
-import type { ExerciseDraft, WorkoutTemplateExercise } from "@/lib/types";
+import type { ExerciseDraft, ExerciseLibraryEntry, WorkoutTemplateExercise } from "@/lib/types";
 import { createDraftKey, parseOptionalInt, parseOptionalNumber, parseOptionalText } from "@/lib/utils";
 import { isValidYoutubeUrl, normalizeOptionalUrl } from "@/lib/youtube";
 
@@ -6,6 +6,7 @@ export function exerciseToDraft(exercise: WorkoutTemplateExercise): ExerciseDraf
   return {
     key: exercise.id,
     id: exercise.id,
+    exercise_library_id: exercise.exercise_library_id ?? undefined,
     name: exercise.name,
     sets: exercise.sets?.toString() ?? "",
     repetitions: exercise.repetitions ?? "",
@@ -15,6 +16,22 @@ export function exerciseToDraft(exercise: WorkoutTemplateExercise): ExerciseDraf
     rest_seconds: exercise.rest_seconds?.toString() ?? "",
     notes: exercise.notes ?? "",
     video_url: exercise.video_url ?? "",
+  };
+}
+
+export function libraryExerciseToDraft(entry: ExerciseLibraryEntry): ExerciseDraft {
+  return {
+    key: createDraftKey(),
+    exercise_library_id: entry.id,
+    name: entry.name,
+    sets: "",
+    repetitions: entry.default_repetitions ?? "",
+    duration_seconds: entry.default_duration_seconds?.toString() ?? "",
+    weight: entry.default_weight?.toString() ?? "",
+    weight_unit: entry.default_weight_unit ?? "lb",
+    rest_seconds: entry.default_rest_seconds?.toString() ?? "",
+    notes: entry.form_instructions ?? "",
+    video_url: entry.video_url ?? "",
   };
 }
 
@@ -59,5 +76,6 @@ export function draftToExerciseInsert(exercise: ExerciseDraft, templateId: strin
     rest_seconds: parseOptionalInt(exercise.rest_seconds),
     notes: parseOptionalText(exercise.notes),
     video_url: normalizeOptionalUrl(exercise.video_url),
+    exercise_library_id: exercise.exercise_library_id ?? null,
   };
 }

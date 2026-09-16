@@ -98,7 +98,14 @@ export function formatSeconds(seconds: number): string {
 }
 
 export function workoutTypeLabel(type: string): string {
-  return type === "circuit" ? "Circuit" : "Standard";
+  if (type === "circuit") return "Circuit";
+  if (type === "run") return "Run";
+  return "Standard";
+}
+
+export function formatDistance(distance: number | null | undefined, unit: string = "mi"): string | null {
+  if (distance == null || Number.isNaN(distance)) return null;
+  return `${distance.toFixed(2)} ${unit}`;
 }
 
 export function statusLabel(status: string): string {

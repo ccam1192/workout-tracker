@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { CreateExerciseForm } from "@/components/create-exercise-form";
 import { ExerciseForm } from "@/components/exercise-form";
+import { ExercisePicker } from "@/components/exercise-picker";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
-import { draftToExerciseInsert, emptyExerciseDraft, validateExerciseDraft } from "@/lib/exercises";
+import { draftToExerciseInsert, emptyExerciseDraft, libraryExerciseToDraft, validateExerciseDraft } from "@/lib/exercises";
 import { getUserFacingError } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
-import type { ExerciseDraft, WorkoutTemplateWithExercises, WorkoutType } from "@/lib/types";
+import type { ExerciseDraft, ExerciseLibraryEntry, WorkoutTemplateWithExercises, WorkoutType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type WorkoutFormProps = {
@@ -32,6 +34,7 @@ export function WorkoutForm({ template }: WorkoutFormProps) {
           .map((exercise) => ({
             key: exercise.id,
             id: exercise.id,
+            exercise_library_id: exercise.exercise_library_id ?? undefined,
             name: exercise.name,
             sets: exercise.sets?.toString() ?? "",
             repetitions: exercise.repetitions ?? "",
@@ -42,10 +45,12 @@ export function WorkoutForm({ template }: WorkoutFormProps) {
             notes: exercise.notes ?? "",
             video_url: exercise.video_url ?? "",
           }))
-      : [emptyExerciseDraft()],
+      : [],
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   function moveExercise(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
@@ -54,6 +59,28 @@ export function WorkoutForm({ template }: WorkoutFormProps) {
     const [item] = next.splice(index, 1);
     next.splice(nextIndex, 0, item);
     setExercises(next);
+  }
+
+  function handleSelectLibraryExercise(entry: ExerciseLibraryEntry) {
+    const draft = libraryExerciseToDraft(entry);
+    setExercises((prev) => [...prev, draft]);
+    setPickerOpen(false);
+  }
+
+  function handleExerciseCreated(entry: ExerciseLibraryEntry) {
+    const draft = libraryExerciseToDraft(entry);
+    setExercises((prev) => [...prev, draft]);
+    setCreateOpen(false);
+    setPickerOpen(false);
+  }
+
+  function handleCreateNew() {
+    setPickerOpen(false);
+    setCreateOpen(true);
+  }
+
+  function handleAddManual() {
+    setExercises([...exercises, emptyExerciseDraft()]);
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -161,114 +188,140 @@ export function WorkoutForm({ template }: WorkoutFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error ? <Alert>{error}</Alert> : null}
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error ? <Alert>{error}</Alert> : null}
 
-      <Field label="Workout name" htmlFor="workout-name">
-        <input
-          id="workout-name"
-          className={inputClassName}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Morning Calisthenics"
-          required
-        />
-      </Field>
-
-      <Field label="Description" htmlFor="workout-description">
-        <textarea
-          id="workout-description"
-          className={textareaClassName}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="What this workout is for"
-        />
-      </Field>
-
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium text-muted">Workout type</legend>
-        <div className="grid grid-cols-2 gap-3">
-          {(
-            [
-              ["standard", "Standard Workout"],
-              ["circuit", "Circuit"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setWorkoutType(value)}
-              className={cn(
-                "min-h-14 rounded-2xl border px-4 text-sm font-semibold transition",
-                workoutType === value
-                  ? "border-accent bg-accent-soft text-accent"
-                  : "border-border bg-surface text-muted",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      <Field
-        label="Number of rounds"
-        htmlFor="workout-rounds"
-        hint={
-          workoutType === "circuit"
-            ? "Complete every exercise in a round, then repeat."
-            : "Usually 1 for a standard workout."
-        }
-      >
-        <input
-          id="workout-rounds"
-          className={cn(inputClassName, workoutType === "circuit" && "border-accent")}
-          inputMode="numeric"
-          value={rounds}
-          onChange={(event) => setRounds(event.target.value)}
-        />
-      </Field>
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Exercises</h2>
-          <span className="text-sm text-muted">{exercises.length}</span>
-        </div>
-        {exercises.map((exercise, index) => (
-          <ExerciseForm
-            key={exercise.key}
-            index={index}
-            exercise={exercise}
-            canMoveUp={index > 0}
-            canMoveDown={index < exercises.length - 1}
-            onChange={(next) => {
-              const copy = [...exercises];
-              copy[index] = next;
-              setExercises(copy);
-            }}
-            onMoveUp={() => moveExercise(index, -1)}
-            onMoveDown={() => moveExercise(index, 1)}
-            onDelete={() => {
-              setExercises(exercises.filter((_, exerciseIndex) => exerciseIndex !== index));
-            }}
+        <Field label="Workout name" htmlFor="workout-name">
+          <input
+            id="workout-name"
+            className={inputClassName}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Morning Calisthenics"
+            required
           />
-        ))}
-        <Button
-          variant="secondary"
-          className="w-full"
-          size="lg"
-          onClick={() => setExercises([...exercises, emptyExerciseDraft()])}
-        >
-          <Plus className="h-5 w-5" />
-          Add exercise
-        </Button>
-      </div>
+        </Field>
 
-      <div className="sticky bottom-24 z-10 pt-2 md:bottom-4">
-        <Button type="submit" size="lg" className="w-full shadow-lg shadow-black/30" disabled={saving}>
-          {saving ? "Saving…" : "Save Workout"}
-        </Button>
-      </div>
-    </form>
+        <Field label="Description" htmlFor="workout-description">
+          <textarea
+            id="workout-description"
+            className={textareaClassName}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What this workout is for"
+          />
+        </Field>
+
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-muted">Workout type</legend>
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                ["standard", "Standard Workout"],
+                ["circuit", "Circuit"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setWorkoutType(value)}
+                className={cn(
+                  "min-h-14 rounded-2xl border px-4 text-sm font-semibold transition",
+                  workoutType === value
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-border bg-surface text-muted",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <Field
+          label="Number of rounds"
+          htmlFor="workout-rounds"
+          hint={
+            workoutType === "circuit"
+              ? "Complete every exercise in a round, then repeat."
+              : "Usually 1 for a standard workout."
+          }
+        >
+          <input
+            id="workout-rounds"
+            className={cn(inputClassName, workoutType === "circuit" && "border-accent")}
+            inputMode="numeric"
+            value={rounds}
+            onChange={(event) => setRounds(event.target.value)}
+          />
+        </Field>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Exercises</h2>
+            <span className="text-sm text-muted">{exercises.length}</span>
+          </div>
+          {exercises.map((exercise, index) => (
+            <ExerciseForm
+              key={exercise.key}
+              index={index}
+              exercise={exercise}
+              canMoveUp={index > 0}
+              canMoveDown={index < exercises.length - 1}
+              onChange={(next) => {
+                const copy = [...exercises];
+                copy[index] = next;
+                setExercises(copy);
+              }}
+              onMoveUp={() => moveExercise(index, -1)}
+              onMoveDown={() => moveExercise(index, 1)}
+              onDelete={() => {
+                setExercises(exercises.filter((_, exerciseIndex) => exerciseIndex !== index));
+              }}
+            />
+          ))}
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="primary"
+              className="w-full"
+              size="lg"
+              onClick={() => setPickerOpen(true)}
+            >
+              <Plus className="h-5 w-5" />
+              Add Exercise
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full"
+              size="lg"
+              onClick={handleAddManual}
+            >
+              <Plus className="h-5 w-5" />
+              Add Custom
+            </Button>
+          </div>
+        </div>
+
+        <div className="sticky bottom-24 z-10 pt-2 md:bottom-4">
+          <Button type="submit" size="lg" className="w-full shadow-lg shadow-black/30" disabled={saving}>
+            {saving ? "Saving…" : "Save Workout"}
+          </Button>
+        </div>
+      </form>
+
+      <ExercisePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelectLibraryExercise}
+        onCreateNew={handleCreateNew}
+      />
+
+      <CreateExerciseForm
+        open={createOpen}
+        onClose={() => { setCreateOpen(false); setPickerOpen(true); }}
+        onCreated={handleExerciseCreated}
+      />
+    </>
   );
 }

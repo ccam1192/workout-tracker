@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { formatDisplayDate, formatDuration } from "@/lib/dates";
-import { statusLabel, workoutTypeLabel } from "@/lib/format";
+import { formatDistance, statusLabel, workoutTypeLabel } from "@/lib/format";
 import type { WorkoutSession } from "@/lib/types";
 
 type HistoryItemProps = {
@@ -10,6 +10,8 @@ type HistoryItemProps = {
 
 export function HistoryItem({ session }: HistoryItemProps) {
   const duration = formatDuration(session.duration_seconds);
+  const isRun = session.workout_type === "run";
+  const distanceLabel = isRun ? formatDistance(session.distance, session.distance_unit ?? "mi") : null;
 
   return (
     <Link
@@ -20,9 +22,18 @@ export function HistoryItem({ session }: HistoryItemProps) {
         <p className="text-sm text-muted">{formatDisplayDate(session.workout_date)}</p>
         <h3 className="mt-1 text-lg font-semibold">{session.template_name}</h3>
         <p className="mt-2 text-sm text-muted">
-          {session.rounds} {session.rounds === 1 ? "round" : "rounds"}
-          {duration ? ` · ${duration}` : ""}
-          {` · ${workoutTypeLabel(session.workout_type)}`}
+          {isRun ? (
+            <>
+              {distanceLabel ?? "0.00 mi"}
+              {duration ? ` · ${duration}` : ""}
+            </>
+          ) : (
+            <>
+              {session.rounds} {session.rounds === 1 ? "round" : "rounds"}
+              {duration ? ` · ${duration}` : ""}
+              {` · ${workoutTypeLabel(session.workout_type)}`}
+            </>
+          )}
         </p>
       </div>
       <div className="flex items-center gap-2">

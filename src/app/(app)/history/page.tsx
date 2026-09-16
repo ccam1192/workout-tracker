@@ -1,9 +1,11 @@
 import { Clock3 } from "lucide-react";
 import { ConfigError } from "@/components/config-error";
 import { EmptyState } from "@/components/ui/empty-state";
-import { HistoryItem } from "@/components/history-item";
+import { HistoryList } from "@/components/history-list";
 import { requireUser } from "@/lib/supabase/require-user";
 import type { WorkoutSession } from "@/lib/types";
+
+const PAGE_SIZE = 20;
 
 export const metadata = {
   title: "History",
@@ -20,7 +22,8 @@ export default async function HistoryPage() {
     .select("*")
     .eq("status", "completed")
     .order("workout_date", { ascending: false })
-    .order("completed_at", { ascending: false });
+    .order("completed_at", { ascending: false })
+    .limit(PAGE_SIZE);
 
   const items = (sessions as WorkoutSession[] | null) ?? [];
 
@@ -40,11 +43,10 @@ export default async function HistoryPage() {
           actionLabel="Go to Dashboard"
         />
       ) : (
-        <div className="space-y-3">
-          {items.map((session) => (
-            <HistoryItem key={session.id} session={session} />
-          ))}
-        </div>
+        <HistoryList
+          initialSessions={items}
+          hasMore={items.length === PAGE_SIZE}
+        />
       )}
     </div>
   );

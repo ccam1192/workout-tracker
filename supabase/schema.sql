@@ -1,5 +1,6 @@
--- Workout Tracker schema
+-- Workout Tracker schema (V2)
 -- Paste this into the Supabase SQL Editor and run it.
+-- For existing databases, use supabase/migrations/002_v2_features.sql instead.
 
 create extension if not exists pgcrypto;
 
@@ -12,21 +13,49 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- Exercise Library: reusable exercise definitions
+-- user_id = NULL + is_system_exercise = true → built-in exercise visible to all
+-- user_id = <uuid> + is_system_exercise = false → user's personal exercise
+create table if not exists public.exercise_library (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles (id) on delete cascade,
+  name text not null,
+  category text not null default 'Other',
+  description text,
+  form_instructions text,
+  primary_muscles text,
+  equipment text,
+  exercise_type text not null default 'bodyweight'
+    check (exercise_type in ('bodyweight', 'barbell', 'dumbbell', 'machine', 'cable', 'other')),
+  default_repetitions text,
+  default_duration_seconds integer,
+  default_weight numeric,
+  default_weight_unit text,
+  default_rest_seconds integer,
+  video_url text,
+  is_system_exercise boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.workout_templates (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
   name text not null,
   description text,
   workout_type text not null default 'standard'
-    check (workout_type in ('standard', 'circuit')),
+    check (workout_type in ('standard', 'circuit', 'run')),
   rounds integer default 1 check (rounds is null or rounds >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+-- Workout-specific exercise configuration. References library for provenance,
+-- but stores its own name/settings so the workout is independent of library edits.
 create table if not exists public.workout_template_exercises (
   id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.workout_templates (id) on delete cascade,
+  exercise_library_id uuid references public.exercise_library (id) on delete set null,
   exercise_order integer not null default 1,
   name text not null,
   sets integer,
@@ -41,6 +70,7 @@ create table if not exists public.workout_template_exercises (
   updated_at timestamptz not null default now()
 );
 
+-- Workout sessions: standard/circuit exercise sessions and runs
 create table if not exists public.workout_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
@@ -52,9 +82,14 @@ create table if not exists public.workout_sessions (
   workout_date date not null,
   template_name text not null,
   workout_type text not null default 'standard'
-    check (workout_type in ('standard', 'circuit')),
+    check (workout_type in ('standard', 'circuit', 'run')),
   rounds integer not null default 1,
   duration_seconds integer,
+  -- Run-specific fields
+  distance numeric,
+  distance_unit text default 'mi',
+  active_duration_seconds integer,
+  gps_data jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -96,17 +131,31 @@ create table if not exists public.workout_session_exercises (
 -- Indexes
 -- ---------------------------------------------------------------------------
 
+create index if not exists exercise_library_user_id_idx
+  on public.exercise_library (user_id);
+create index if not exists exercise_library_system_idx
+  on public.exercise_library (is_system_exercise) where is_system_exercise = true;
+create index if not exists exercise_library_category_idx
+  on public.exercise_library (category);
+create index if not exists exercise_library_name_idx
+  on public.exercise_library (lower(name));
+
 create index if not exists workout_templates_user_id_idx
   on public.workout_templates (user_id);
 
 create index if not exists workout_template_exercises_template_id_idx
   on public.workout_template_exercises (template_id, exercise_order);
+create index if not exists workout_template_exercises_library_id_idx
+  on public.workout_template_exercises (exercise_library_id);
 
 create index if not exists workout_sessions_user_id_idx
   on public.workout_sessions (user_id, workout_date desc);
-
 create index if not exists workout_sessions_status_idx
   on public.workout_sessions (user_id, status);
+create index if not exists workout_sessions_type_idx
+  on public.workout_sessions (user_id, workout_type);
+create index if not exists workout_sessions_completed_at_idx
+  on public.workout_sessions (completed_at desc) where status = 'completed';
 
 create index if not exists workout_session_exercises_session_id_idx
   on public.workout_session_exercises (session_id, round_number, exercise_order, set_number);
@@ -136,6 +185,11 @@ create trigger workout_templates_set_updated_at
 drop trigger if exists workout_template_exercises_set_updated_at on public.workout_template_exercises;
 create trigger workout_template_exercises_set_updated_at
   before update on public.workout_template_exercises
+  for each row execute function public.set_updated_at();
+
+drop trigger if exists exercise_library_set_updated_at on public.exercise_library;
+create trigger exercise_library_set_updated_at
+  before update on public.exercise_library
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -443,16 +497,89 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Start a run session
+-- ---------------------------------------------------------------------------
+
+create or replace function public.start_run_session(p_workout_date date)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_session_id uuid;
+begin
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  insert into public.workout_sessions (
+    user_id, started_at, status, workout_date,
+    template_name, workout_type, rounds
+  ) values (
+    v_user_id, now(), 'in_progress', p_workout_date,
+    'Run', 'run', 1
+  )
+  returning id into v_session_id;
+
+  return v_session_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Complete a run session
+-- ---------------------------------------------------------------------------
+
+create or replace function public.complete_run_session(
+  p_session_id uuid,
+  p_distance numeric,
+  p_distance_unit text,
+  p_active_duration_seconds integer,
+  p_gps_data jsonb default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  update public.workout_sessions
+  set
+    status = 'completed',
+    completed_at = now(),
+    duration_seconds = p_active_duration_seconds,
+    distance = p_distance,
+    distance_unit = p_distance_unit,
+    active_duration_seconds = p_active_duration_seconds,
+    gps_data = p_gps_data
+  where id = p_session_id and user_id = v_user_id and workout_type = 'run';
+
+  if not found then
+    raise exception 'Session not found';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 
 alter table public.profiles enable row level security;
+alter table public.exercise_library enable row level security;
 alter table public.workout_templates enable row level security;
 alter table public.workout_template_exercises enable row level security;
 alter table public.workout_sessions enable row level security;
 alter table public.workout_session_exercises enable row level security;
 alter table public.workout_session_rounds enable row level security;
 
+-- Profiles
 drop policy if exists "Users can view own profile" on public.profiles;
 create policy "Users can view own profile"
   on public.profiles for select
@@ -463,6 +590,34 @@ create policy "Users can insert own profile"
   on public.profiles for insert
   with check (id = auth.uid());
 
+-- Exercise Library
+drop policy if exists "Users can view system exercises" on public.exercise_library;
+create policy "Users can view system exercises"
+  on public.exercise_library for select
+  using (is_system_exercise = true);
+
+drop policy if exists "Users can view own exercises" on public.exercise_library;
+create policy "Users can view own exercises"
+  on public.exercise_library for select
+  using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own exercises" on public.exercise_library;
+create policy "Users can insert own exercises"
+  on public.exercise_library for insert
+  with check (user_id = auth.uid() and is_system_exercise = false);
+
+drop policy if exists "Users can update own exercises" on public.exercise_library;
+create policy "Users can update own exercises"
+  on public.exercise_library for update
+  using (user_id = auth.uid() and is_system_exercise = false)
+  with check (user_id = auth.uid() and is_system_exercise = false);
+
+drop policy if exists "Users can delete own exercises" on public.exercise_library;
+create policy "Users can delete own exercises"
+  on public.exercise_library for delete
+  using (user_id = auth.uid() and is_system_exercise = false);
+
+-- Workout Templates
 drop policy if exists "Users can view own templates" on public.workout_templates;
 create policy "Users can view own templates"
   on public.workout_templates for select
@@ -484,6 +639,7 @@ create policy "Users can delete own templates"
   on public.workout_templates for delete
   using (user_id = auth.uid());
 
+-- Workout Template Exercises
 drop policy if exists "Users can view own template exercises" on public.workout_template_exercises;
 create policy "Users can view own template exercises"
   on public.workout_template_exercises for select
@@ -530,6 +686,7 @@ create policy "Users can delete own template exercises"
     )
   );
 
+-- Workout Sessions
 drop policy if exists "Users can view own sessions" on public.workout_sessions;
 create policy "Users can view own sessions"
   on public.workout_sessions for select
@@ -551,6 +708,7 @@ create policy "Users can delete own sessions"
   on public.workout_sessions for delete
   using (user_id = auth.uid());
 
+-- Workout Session Exercises
 drop policy if exists "Users can view own session exercises" on public.workout_session_exercises;
 create policy "Users can view own session exercises"
   on public.workout_session_exercises for select
@@ -597,6 +755,7 @@ create policy "Users can delete own session exercises"
     )
   );
 
+-- Workout Session Rounds
 drop policy if exists "Users can view own session rounds" on public.workout_session_rounds;
 create policy "Users can view own session rounds"
   on public.workout_session_rounds for select
@@ -650,6 +809,7 @@ create policy "Users can delete own session rounds"
 grant usage on schema public to anon, authenticated;
 
 grant select, insert on public.profiles to authenticated;
+grant select, insert, update, delete on public.exercise_library to authenticated;
 grant select, insert, update, delete on public.workout_templates to authenticated;
 grant select, insert, update, delete on public.workout_template_exercises to authenticated;
 grant select, insert, update, delete on public.workout_sessions to authenticated;
@@ -659,3 +819,5 @@ grant select, insert, update, delete on public.workout_session_rounds to authent
 grant execute on function public.ensure_starter_workout() to authenticated;
 grant execute on function public.start_workout_session(uuid, date) to authenticated;
 grant execute on function public.complete_workout_session(uuid) to authenticated;
+grant execute on function public.start_run_session(date) to authenticated;
+grant execute on function public.complete_run_session(uuid, numeric, text, integer, jsonb) to authenticated;

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ConfigError } from "@/components/config-error";
+import { RunTracker } from "@/components/run-tracker";
 import { WorkoutPlayer } from "@/components/workout-player";
 import { requireUser } from "@/lib/supabase/require-user";
 import type {
@@ -37,6 +38,12 @@ export default async function WorkoutSessionPage({
     redirect(`/workout/${sessionId}/complete`);
   }
 
+  const typedSession = session as WorkoutSession;
+
+  if (typedSession.workout_type === "run") {
+    return <RunTracker session={typedSession} />;
+  }
+
   const [{ data: exercises }, { data: rounds }] = await Promise.all([
     supabase
       .from("workout_session_exercises")
@@ -54,7 +61,7 @@ export default async function WorkoutSessionPage({
 
   return (
     <WorkoutPlayer
-      session={session as WorkoutSession}
+      session={typedSession}
       initialExercises={(exercises as WorkoutSessionExercise[]) ?? []}
       initialRounds={(rounds as WorkoutSessionRound[]) ?? []}
     />
