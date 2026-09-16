@@ -1,6 +1,8 @@
--- Workout Tracker schema (V2)
--- Paste this into the Supabase SQL Editor and run it.
--- For existing databases, use supabase/migrations/002_v2_features.sql instead.
+-- Workout Tracker schema (V2 — complete)
+-- For a FRESH install, paste this into the Supabase SQL Editor and run it.
+-- For existing databases, run the incremental migrations in order:
+--   supabase/migrations/002_v2_features.sql
+--   supabase/migrations/003_v2_ai_admin.sql
 
 create extension if not exists pgcrypto;
 
@@ -10,6 +12,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
+  role text not null default 'user' check (role in ('user', 'admin')),
   created_at timestamptz not null default now()
 );
 
@@ -36,6 +39,18 @@ create table if not exists public.exercise_library (
   is_system_exercise boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- Encrypted API key storage (per-user)
+create table if not exists public.user_api_keys (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  provider text not null default 'openai',
+  encrypted_key text not null,
+  key_hint text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider)
 );
 
 create table if not exists public.workout_templates (
@@ -131,6 +146,9 @@ create table if not exists public.workout_session_exercises (
 -- Indexes
 -- ---------------------------------------------------------------------------
 
+create index if not exists user_api_keys_user_provider_idx
+  on public.user_api_keys (user_id, provider);
+
 create index if not exists exercise_library_user_id_idx
   on public.exercise_library (user_id);
 create index if not exists exercise_library_system_idx
@@ -187,6 +205,11 @@ create trigger workout_template_exercises_set_updated_at
   before update on public.workout_template_exercises
   for each row execute function public.set_updated_at();
 
+drop trigger if exists user_api_keys_set_updated_at on public.user_api_keys;
+create trigger user_api_keys_set_updated_at
+  before update on public.user_api_keys
+  for each row execute function public.set_updated_at();
+
 drop trigger if exists exercise_library_set_updated_at on public.exercise_library;
 create trigger exercise_library_set_updated_at
   before update on public.exercise_library
@@ -214,6 +237,23 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- Admin check helper
+-- ---------------------------------------------------------------------------
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Starter workout (per user, only when they have zero templates)
@@ -572,6 +612,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 alter table public.profiles enable row level security;
+alter table public.user_api_keys enable row level security;
 alter table public.exercise_library enable row level security;
 alter table public.workout_templates enable row level security;
 alter table public.workout_template_exercises enable row level security;
@@ -589,6 +630,28 @@ drop policy if exists "Users can insert own profile" on public.profiles;
 create policy "Users can insert own profile"
   on public.profiles for insert
   with check (id = auth.uid());
+
+-- User API Keys
+drop policy if exists "Users can view own api keys" on public.user_api_keys;
+create policy "Users can view own api keys"
+  on public.user_api_keys for select
+  using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own api keys" on public.user_api_keys;
+create policy "Users can insert own api keys"
+  on public.user_api_keys for insert
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users can update own api keys" on public.user_api_keys;
+create policy "Users can update own api keys"
+  on public.user_api_keys for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users can delete own api keys" on public.user_api_keys;
+create policy "Users can delete own api keys"
+  on public.user_api_keys for delete
+  using (user_id = auth.uid());
 
 -- Exercise Library
 drop policy if exists "Users can view system exercises" on public.exercise_library;
@@ -616,6 +679,35 @@ drop policy if exists "Users can delete own exercises" on public.exercise_librar
 create policy "Users can delete own exercises"
   on public.exercise_library for delete
   using (user_id = auth.uid() and is_system_exercise = false);
+
+-- Admin can manage global exercises
+drop policy if exists "Admins can insert global exercises" on public.exercise_library;
+create policy "Admins can insert global exercises"
+  on public.exercise_library for insert
+  with check (
+    is_system_exercise = true and user_id is null
+    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+drop policy if exists "Admins can update global exercises" on public.exercise_library;
+create policy "Admins can update global exercises"
+  on public.exercise_library for update
+  using (
+    is_system_exercise = true
+    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  )
+  with check (
+    is_system_exercise = true
+    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+drop policy if exists "Admins can delete global exercises" on public.exercise_library;
+create policy "Admins can delete global exercises"
+  on public.exercise_library for delete
+  using (
+    is_system_exercise = true
+    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
 
 -- Workout Templates
 drop policy if exists "Users can view own templates" on public.workout_templates;
@@ -809,6 +901,7 @@ create policy "Users can delete own session rounds"
 grant usage on schema public to anon, authenticated;
 
 grant select, insert on public.profiles to authenticated;
+grant select, insert, update, delete on public.user_api_keys to authenticated;
 grant select, insert, update, delete on public.exercise_library to authenticated;
 grant select, insert, update, delete on public.workout_templates to authenticated;
 grant select, insert, update, delete on public.workout_template_exercises to authenticated;
@@ -821,3 +914,4 @@ grant execute on function public.start_workout_session(uuid, date) to authentica
 grant execute on function public.complete_workout_session(uuid) to authenticated;
 grant execute on function public.start_run_session(date) to authenticated;
 grant execute on function public.complete_run_session(uuid, numeric, text, integer, jsonb) to authenticated;
+grant execute on function public.is_admin() to authenticated;

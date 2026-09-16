@@ -1,9 +1,12 @@
 import { AppShell } from "@/components/app-shell";
+import { requireUser } from "@/lib/supabase/require-user";
 
-export default function AuthenticatedLayout({
+export default async function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  const { role } = await requireUser();
+
+  return <AppShell isAdmin={role === "admin"}>{children}</AppShell>;
 }

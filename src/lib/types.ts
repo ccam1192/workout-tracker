@@ -145,3 +145,58 @@ export type ExerciseDraft = {
 export type TemplateCardData = WorkoutTemplate & {
   exerciseCount: number;
 };
+
+export type UserRole = "user" | "admin";
+
+export type Profile = {
+  id: string;
+  role: UserRole;
+  created_at: string;
+};
+
+export type AiKeyStatus = {
+  hasKey: boolean;
+  keyHint: string | null;
+};
+
+export type AiMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type AiWorkoutExercise = {
+  exercise_library_id: string | null;
+  name: string;
+  sets: number | null;
+  repetitions: string | null;
+  duration_seconds: number | null;
+  weight: number | null;
+  weight_unit: string | null;
+  rest_seconds: number | null;
+  notes: string | null;
+};
+
+export type AiProposedExercise = {
+  name: string;
+  category: string;
+  description: string;
+  form_instructions: string;
+  primary_muscles: string;
+  equipment: string;
+  exercise_type: string;
+  default_repetitions: string | null;
+  default_duration_seconds: number | null;
+};
+
+export type AiWorkoutProposal = {
+  workout: {
+    name: string;
+    description: string;
+    workout_type: "standard" | "circuit";
+    rounds: number;
+    estimated_duration_minutes: number;
+    exercises: AiWorkoutExercise[];
+  };
+  proposed_new_exercises: AiProposedExercise[];
+  message: string;
+};

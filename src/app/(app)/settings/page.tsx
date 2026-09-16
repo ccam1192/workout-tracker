@@ -1,15 +1,28 @@
+import { AiSettings } from "@/components/ai-settings";
 import { ConfigError } from "@/components/config-error";
 import { LogoutButton } from "@/components/logout-button";
 import { requireUser } from "@/lib/supabase/require-user";
+import type { AiKeyStatus } from "@/lib/types";
 
 export const metadata = {
   title: "Settings",
 };
 
 export default async function SettingsPage() {
-  const { user, configured } = await requireUser();
-  if (!configured || !user) {
+  const { supabase, user, configured } = await requireUser();
+  if (!configured || !user || !supabase) {
     return <ConfigError />;
+  }
+
+  let aiKeyStatus: AiKeyStatus = { hasKey: false, keyHint: null };
+  const { data: keyRow } = await supabase
+    .from("user_api_keys")
+    .select("key_hint")
+    .eq("user_id", user.id)
+    .eq("provider", "openai")
+    .maybeSingle();
+  if (keyRow) {
+    aiKeyStatus = { hasKey: true, keyHint: keyRow.key_hint };
   }
 
   return (
@@ -23,6 +36,8 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
         <p className="mt-3 text-lg font-medium break-all">{user.email}</p>
       </section>
+
+      <AiSettings initialStatus={aiKeyStatus} />
 
       <LogoutButton />
     </div>

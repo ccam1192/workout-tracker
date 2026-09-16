@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Clock3, Dumbbell, LayoutGrid, Settings } from "lucide-react";
+import { BookOpen, Clock3, Dumbbell, LayoutGrid, Settings, Shield, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -50,7 +50,7 @@ export function BottomNav() {
   );
 }
 
-export function SidebarNav() {
+export function SidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -80,6 +80,45 @@ export function SidebarNav() {
             </li>
           );
         })}
+
+        <li className="pt-2">
+          <Link
+            href="/workouts/ai"
+            className={cn(
+              "flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium transition",
+              isActive(pathname, "/workouts/ai")
+                ? "bg-accent-soft text-accent"
+                : "text-muted hover:bg-surface hover:text-text",
+            )}
+          >
+            <Sparkles className="h-5 w-5" />
+            AI Builder
+          </Link>
+        </li>
+
+        {isAdmin ? (
+          <>
+            <li className="pt-4">
+              <p className="px-3 text-xs font-semibold uppercase tracking-widest text-muted/60">
+                Admin
+              </p>
+            </li>
+            <li>
+              <Link
+                href="/admin/exercises"
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium transition",
+                  isActive(pathname, "/admin/exercises")
+                    ? "bg-accent-soft text-accent"
+                    : "text-muted hover:bg-surface hover:text-text",
+                )}
+              >
+                <Shield className="h-5 w-5" />
+                Global Exercises
+              </Link>
+            </li>
+          </>
+        ) : null}
       </ul>
     </aside>
   );

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Play } from "lucide-react";
+import { Dumbbell, Play, Sparkles } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -100,6 +100,10 @@ export function DashboardView({ templates, inProgress, recent }: DashboardViewPr
             New Workout
           </ButtonLink>
         </div>
+        <ButtonLink href="/workouts/ai" variant="secondary" size="lg" className="w-full">
+          <Sparkles className="h-5 w-5" />
+          AI Workout Builder
+        </ButtonLink>
       </section>
 
       <section className="space-y-4">
