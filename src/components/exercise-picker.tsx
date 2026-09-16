@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { inputClassName } from "@/components/ui/field";
+import { FILTER_CATEGORIES, matchesCategory } from "@/lib/exercise-categories";
 import { createClient } from "@/lib/supabase/client";
 import type { ExerciseLibraryEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,15 +15,6 @@ type ExercisePickerProps = {
   onSelect: (exercise: ExerciseLibraryEntry) => void;
   onCreateNew: () => void;
 };
-
-const CATEGORIES = [
-  "All",
-  "Calisthenics",
-  "Weight Training",
-  "Core",
-  "Cardio",
-  "Other",
-] as const;
 
 export function ExercisePicker({ open, onClose, onSelect, onCreateNew }: ExercisePickerProps) {
   const [exercises, setExercises] = useState<ExerciseLibraryEntry[]>([]);
@@ -56,7 +48,7 @@ export function ExercisePicker({ open, onClose, onSelect, onCreateNew }: Exercis
     let results = exercises;
 
     if (category !== "All") {
-      results = results.filter((e) => e.category === category);
+      results = results.filter((e) => matchesCategory(e, category));
     }
 
     const query = search.trim().toLowerCase();
@@ -104,7 +96,7 @@ export function ExercisePicker({ open, onClose, onSelect, onCreateNew }: Exercis
         </div>
 
         <div className="flex gap-2 overflow-x-auto border-b border-border px-5 py-3">
-          {CATEGORIES.map((cat) => (
+          {FILTER_CATEGORIES.map((cat) => (
             <button
               key={cat}
               type="button"

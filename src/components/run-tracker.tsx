@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Pause, Play } from "lucide-react";
+import { MapPin, Pause, Play, Smartphone } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -30,15 +30,40 @@ export function RunTracker({ session }: RunTrackerProps) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const pausedRef = useRef(false);
   const lastPointRef = useRef<GpsPoint | null>(null);
   const gpsPointsRef = useRef<GpsPoint[]>([]);
   const distanceRef = useRef(0);
 
   pausedRef.current = paused;
+
+  const acquireWakeLock = useCallback(async () => {
+    if (!("wakeLock" in navigator)) return;
+    try {
+      wakeLockRef.current = await navigator.wakeLock.request("screen");
+      setWakeLockActive(true);
+      wakeLockRef.current.addEventListener("release", () => {
+        setWakeLockActive(false);
+      });
+    } catch {
+      setWakeLockActive(false);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch { /* already released */ }
+      wakeLockRef.current = null;
+      setWakeLockActive(false);
+    }
+  }, []);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) return;
@@ -118,21 +143,33 @@ export function RunTracker({ session }: RunTrackerProps) {
   useEffect(() => {
     startTimer();
     startGps();
+    void acquireWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !pausedRef.current) {
+        void acquireWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       stopTimer();
       stopGps();
+      void releaseWakeLock();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [startTimer, startGps, stopTimer, stopGps]);
+  }, [startTimer, startGps, stopTimer, stopGps, acquireWakeLock, releaseWakeLock]);
 
   function handlePause() {
     setPaused(true);
     lastPointRef.current = null;
+    void releaseWakeLock();
   }
 
   function handleResume() {
     setPaused(false);
     lastPointRef.current = null;
+    void acquireWakeLock();
   }
 
   async function finishRun() {
@@ -142,6 +179,7 @@ export function RunTracker({ session }: RunTrackerProps) {
     setRunning(false);
     stopTimer();
     stopGps();
+    void releaseWakeLock();
 
     try {
       const supabase = createClient();
@@ -217,6 +255,15 @@ export function RunTracker({ session }: RunTrackerProps) {
           <div className="mt-6 flex items-center gap-2 text-sm text-muted">
             <MapPin className="h-4 w-4 animate-pulse text-danger" />
             Waiting for GPS signal…
+          </div>
+        ) : null}
+
+        {running && !paused ? (
+          <div className="mt-4 flex items-center gap-2 text-xs text-muted">
+            <Smartphone className="h-3.5 w-3.5" />
+            {wakeLockActive
+              ? "Screen will stay on while running"
+              : "Keep this screen open to track your run"}
           </div>
         ) : null}
 

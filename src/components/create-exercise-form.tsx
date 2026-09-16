@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
+import { EXERCISE_CATEGORIES } from "@/lib/exercise-categories";
 import { getUserFacingError } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { ExerciseLibraryEntry } from "@/lib/types";
@@ -15,14 +16,6 @@ type CreateExerciseFormProps = {
   onClose: () => void;
   onCreated: (exercise: ExerciseLibraryEntry) => void;
 };
-
-const CATEGORIES = [
-  "Calisthenics",
-  "Weight Training",
-  "Core",
-  "Cardio",
-  "Other",
-] as const;
 
 const EQUIPMENT_TYPES = [
   { value: "bodyweight", label: "Bodyweight" },
@@ -172,7 +165,7 @@ export function CreateExerciseForm({ open, onClose, onCreated }: CreateExerciseF
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-muted">Category</legend>
               <div className="flex flex-wrap gap-2">
-                {CATEGORIES.map((cat) => (
+                {EXERCISE_CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     type="button"

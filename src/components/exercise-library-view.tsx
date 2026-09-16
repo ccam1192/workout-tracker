@@ -6,19 +6,11 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
+import { FILTER_CATEGORIES, matchesCategory } from "@/lib/exercise-categories";
 import { getUserFacingError } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { ExerciseLibraryEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES = [
-  "All",
-  "Calisthenics",
-  "Weight Training",
-  "Core",
-  "Cardio",
-  "Other",
-] as const;
 
 export function ExerciseLibraryView() {
   const [exercises, setExercises] = useState<ExerciseLibraryEntry[]>([]);
@@ -63,7 +55,7 @@ export function ExerciseLibraryView() {
     }
 
     if (category !== "All") {
-      results = results.filter((e) => e.category === category);
+      results = results.filter((e) => matchesCategory(e, category));
     }
 
     const query = search.trim().toLowerCase();
@@ -182,7 +174,7 @@ export function ExerciseLibraryView() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto">
-        {CATEGORIES.map((cat) => (
+        {FILTER_CATEGORIES.map((cat) => (
           <button
             key={cat}
             type="button"
@@ -335,7 +327,7 @@ export function ExerciseLibraryView() {
                     value={editing.category}
                     onChange={(e) => setEditing({ ...editing, category: e.target.value })}
                   >
-                    {CATEGORIES.filter((c) => c !== "All").map((c) => (
+                    {FILTER_CATEGORIES.filter((c) => c !== "All").map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
