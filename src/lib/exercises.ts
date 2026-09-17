@@ -30,7 +30,7 @@ export function libraryExerciseToDraft(entry: ExerciseLibraryEntry): ExerciseDra
     weight: entry.default_weight?.toString() ?? "",
     weight_unit: entry.default_weight_unit ?? "lb",
     rest_seconds: entry.default_rest_seconds?.toString() ?? "",
-    notes: entry.form_instructions ?? "",
+    notes: "",
     video_url: entry.video_url ?? "",
   };
 }

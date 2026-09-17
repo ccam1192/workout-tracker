@@ -182,8 +182,8 @@ export function AiWorkoutBuilder({ hasAiKey }: Props) {
         </div>
         <h2 className="text-xl font-semibold">AI Workout Builder</h2>
         <p className="mt-2 max-w-sm text-muted">
-          Add your OpenAI API key in Settings to enable AI workout creation.
-          You are responsible for your own OpenAI usage and charges.
+          AI Workout Builder needs your own OpenAI API key. OpenAI bills that usage to you —
+          this app does not pay for it. Add a key in Settings to get started.
         </p>
         <ButtonLink href="/settings" className="mt-6" size="lg">
           Configure AI

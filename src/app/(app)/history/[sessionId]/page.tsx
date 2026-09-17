@@ -3,7 +3,7 @@ import { ConfigError } from "@/components/config-error";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { formatDisplayDate, formatDuration } from "@/lib/dates";
-import { formatDistance, formatExercisePrescription, statusLabel, workoutTypeLabel } from "@/lib/format";
+import { formatDistance, statusLabel, workoutTypeLabel } from "@/lib/format";
 import { formatPace } from "@/lib/gps";
 import { requireUser } from "@/lib/supabase/require-user";
 import type {
@@ -12,6 +12,13 @@ import type {
   WorkoutSessionRound,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  actualDiffersFromPlanned,
+  formatHistorySetLine,
+  formatPlannedTarget,
+  groupSessionExercises,
+  normalizeSessionExercise,
+} from "@/lib/workout-tracking";
 
 export const metadata = {
   title: "Workout details",
@@ -111,7 +118,7 @@ export default async function HistoryDetailPage({
       .order("round_number", { ascending: true }),
   ]);
 
-  const items = (exercises as WorkoutSessionExercise[] | null) ?? [];
+  const items = ((exercises as WorkoutSessionExercise[] | null) ?? []).map(normalizeSessionExercise);
   const roundRows = (rounds as WorkoutSessionRound[] | null) ?? [];
   const completedCount = items.filter((exercise) => exercise.completed).length;
   const uniqueRounds = Array.from(new Set(items.map((exercise) => exercise.round_number))).sort(
@@ -133,12 +140,13 @@ export default async function HistoryDetailPage({
       </header>
 
       <p className="rounded-3xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-        {completedCount} of {items.length} exercises completed
+        {completedCount} of {items.length} sets completed
       </p>
 
       {uniqueRounds.map((roundNumber) => {
         const roundTime = roundRows.find((round) => round.round_number === roundNumber);
         const roundExercises = items.filter((exercise) => exercise.round_number === roundNumber);
+        const grouped = groupSessionExercises(roundExercises);
         return (
           <section key={roundNumber} className="space-y-3">
             <div className="flex items-center justify-between">
@@ -151,30 +159,46 @@ export default async function HistoryDetailPage({
                 </span>
               ) : null}
             </div>
-            {roundExercises.map((exercise) => (
-              <article
-                key={exercise.id}
-                className={cn(
-                  "rounded-3xl border p-4",
-                  exercise.completed
-                    ? "border-accent/30 bg-accent-soft/40"
-                    : "border-border bg-surface",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold">{exercise.name}</h3>
-                    <p className="mt-1 text-sm text-muted">
-                      {exercise.sets && exercise.sets > 1 ? `Set ${exercise.set_number} · ` : ""}
-                      {formatExercisePrescription(exercise) || "No target specified"}
-                    </p>
+            {grouped.map((group) => {
+              const first = group[0];
+              if (!first) return null;
+              const allComplete = group.every((exercise) => exercise.completed);
+              const showSets = group.length > 1;
+              const planned = first ? formatPlannedTarget(first) : "";
+              const showPlanned = group.some(actualDiffersFromPlanned);
+              return (
+                <article
+                  key={`${first.round_number}-${first.exercise_order}-${first.id}`}
+                  className={cn(
+                    "rounded-3xl border p-4",
+                    allComplete
+                      ? "border-accent/30 bg-accent-soft/40"
+                      : "border-border bg-surface",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold">{first.name}</h3>
+                      {showPlanned && planned ? (
+                        <p className="mt-1 text-xs text-muted">Planned: {planned}</p>
+                      ) : null}
+                    </div>
+                    <span className="text-sm font-semibold text-accent">
+                      {allComplete ? "Done" : group.some((exercise) => exercise.completed) ? "Partial" : "Skipped"}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-accent">
-                    {exercise.completed ? "Done" : "Skipped"}
-                  </span>
-                </div>
-              </article>
-            ))}
+                  <div className="mt-3 space-y-1.5">
+                    {group.map((exercise, index) => (
+                      <p key={exercise.id} className="text-sm text-muted">
+                        {showSets ? `Set ${index + 1}: ` : ""}
+                        {formatHistorySetLine(exercise)}
+                        {!exercise.completed ? " · skipped" : ""}
+                      </p>
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
           </section>
         );
       })}

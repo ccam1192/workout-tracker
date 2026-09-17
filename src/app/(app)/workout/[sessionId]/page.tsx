@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { ConfigError } from "@/components/config-error";
 import { RunTracker } from "@/components/run-tracker";
 import { WorkoutPlayer } from "@/components/workout-player";
+import { attachLibraryGuidance } from "@/lib/session-guidance";
 import { requireUser } from "@/lib/supabase/require-user";
 import type {
   WorkoutSession,
@@ -59,10 +60,15 @@ export default async function WorkoutSessionPage({
       .order("round_number", { ascending: true }),
   ]);
 
+  const sessionExercises = await attachLibraryGuidance(
+    supabase,
+    (exercises as WorkoutSessionExercise[]) ?? [],
+  );
+
   return (
     <WorkoutPlayer
       session={typedSession}
-      initialExercises={(exercises as WorkoutSessionExercise[]) ?? []}
+      initialExercises={sessionExercises}
       initialRounds={(rounds as WorkoutSessionRound[]) ?? []}
     />
   );

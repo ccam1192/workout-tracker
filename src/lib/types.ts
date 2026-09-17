@@ -103,6 +103,7 @@ export type WorkoutSessionExercise = {
   id: string;
   session_id: string;
   template_exercise_id: string | null;
+  exercise_library_id: string | null;
   exercise_order: number;
   round_number: number;
   set_number: number;
@@ -120,6 +121,10 @@ export type WorkoutSessionExercise = {
   weight_unit: string | null;
   rest_seconds: number | null;
   video_url: string | null;
+  description: string | null;
+  form_instructions: string | null;
+  primary_muscles: string | null;
+  equipment: string | null;
 };
 
 export type WorkoutSessionWithDetails = WorkoutSession & {
